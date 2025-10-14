@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Server</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Image Server</h1>
+    <div id="auth-container">
+        <h2>GitHub Authentication</h2>
+        <p>Please provide your GitHub personal access token to continue.</p>
+        <input type="text" id="github-token" placeholder="GitHub Personal Access Token">
+        <input type="text" id="github-repo" placeholder="GitHub Repo (e.g., user/repo)">
+        <button id="auth-button">Authenticate</button>
+    </div>
+    <div id="content-container" style="display: none;">
+        <div id="folder-container">
+            <h2>Folders</h2>
+            <h3 id="current-folder">Current Folder: /</h3>
+            <ul id="folder-list"></ul>
+            <div id="create-folder-container">
+                <input type="text" id="new-folder-name" placeholder="New folder name">
+                <button id="create-folder-button">Create Folder</button>
+            </div>
+        </div>
+        <div id="image-container">
+            <h2>Images</h2>
+            <ul id="image-list"></ul>
+            <div id="upload-image-container">
+                <input type="file" id="image-upload-input">
+                <button id="upload-image-button">Upload Image</button>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,121 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+
+body {
+    font-family: 'Roboto', sans-serif;
+    background-color: #f4f7f9;
+    color: #333;
+    margin: 0;
+    padding: 20px;
+}
+
+h1 {
+    text-align: center;
+    color: #2c3e50;
+}
+
+#auth-container, #content-container {
+    max-width: 1200px;
+    margin: 20px auto;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+#content-container {
+    display: flex;
+    justify-content: space-between;
+}
+
+#folder-container, #image-container {
+    width: 48%;
+    padding: 20px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+}
+
+h2 {
+    color: #34495e;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 10px;
+}
+
+#folder-list, #image-list {
+    list-style: none;
+    padding: 0;
+}
+
+#folder-list li, #image-list li {
+    padding: 10px;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#folder-list li a {
+    text-decoration: none;
+    color: #3498db;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+#folder-list li a:hover {
+    text-decoration: underline;
+}
+
+#create-folder-container, #upload-image-container {
+    margin-top: 20px;
+    display: flex;
+}
+
+input[type="text"], input[type="file"] {
+    flex-grow: 1;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin-right: 10px;
+}
+
+button {
+    padding: 10px 15px;
+    border: none;
+    border-radius: 4px;
+    background-color: #3498db;
+    color: #fff;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+button:hover {
+    background-color: #2980b9;
+}
+
+#image-list .button-container {
+    display: flex;
+}
+
+#image-list button {
+    margin-left: 5px;
+    background-color: #e74c3c;
+}
+
+#image-list button:hover {
+    background-color: #c0392b;
+}
+
+#image-list button:first-of-type {
+    background-color: #f1c40f;
+}
+
+#image-list button:first-of-type:hover {
+    background-color: #f39c12;
+}
+
+#image-list button:nth-of-type(2) {
+    background-color: #2ecc71;
+}
+
+#image-list button:nth-of-type(2):hover {
+    background-color: #27ae60;
+}
