@@ -1,21 +1,18 @@
 # Image Server
 
-This project is an image server that serves images from the `projects` directory.
+This is a simple image server that allows you to manage images in a GitHub repository. You can create folders, upload images, update images, delete images, and copy the URL of an image.
 
-## Available Images
+## How to use
 
-The following images are available:
+1.  Open the `index.html` file in your browser.
+2.  Enter your GitHub personal access token and the repository you want to use.
+3.  Click the "Authenticate" button.
+4.  You can now manage the images in your repository.
 
-* ai-tool-pro.png
-* android_pwa_icon_dg.png
-* api-key-manager.png
-* art-studio.png
-* auto-text-email.png
-* content-flow.png
-* cosmic-content.png
-* dev-ai-os.png
-* durga.png
-* explainify.png
-* fav-icon.png
-* focus-mode.png
-* nudgeWheel.png
+## Features
+
+*   Create folders
+*   Upload images
+*   Update images
+*   Delete images
+*   Copy the URL of an image
