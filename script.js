@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // DOM Elements
     const authContainer = document.getElementById('auth-container');
     const contentContainer = document.getElementById('content-container');
     const authTokenInput = document.getElementById('github-token');
@@ -6,14 +7,31 @@ document.addEventListener('DOMContentLoaded', () => {
     const authButton = document.getElementById('auth-button');
     const createFolderButton = document.getElementById('create-folder-button');
     const newFolderNameInput = document.getElementById('new-folder-name');
-    const uploadImageButton = document.getElementById('upload-image-button');
-    const imageUploadInput = document.getElementById('image-upload-input');
-    const currentFolderH3 = document.getElementById('current-folder');
+    const uploadFileButton = document.getElementById('upload-file-button');
+    const fileUploadInput = document.getElementById('file-upload-input');
+    const refreshButton = document.getElementById('refresh-button');
+    const currentFolderSpan = document.getElementById('current-folder');
+    
+    // Modal Elements
+    const renameFolderModal = document.getElementById('rename-folder-modal');
+    const deleteModal = document.getElementById('delete-modal');
+    const newFolderNameInputModal = document.getElementById('new-folder-name-input');
+    const folderToRenamePath = document.getElementById('folder-to-rename-path');
+    const confirmRename = document.getElementById('confirm-rename');
+    const cancelRename = document.getElementById('cancel-rename');
+    const confirmDelete = document.getElementById('confirm-delete');
+    const cancelDelete = document.getElementById('cancel-delete');
+    const deleteMessage = document.getElementById('delete-message');
+    const itemToDeletePath = document.getElementById('item-to-delete-path');
+    const itemToDeleteSha = document.getElementById('item-to-delete-sha');
+    const itemToDeleteType = document.getElementById('item-to-delete-type');
 
+    // State
     let githubToken = localStorage.getItem('githubToken') || '';
     let githubRepo = localStorage.getItem('githubRepo') || '';
     let currentFolder = '';
 
+    // Initialize
     authTokenInput.value = githubToken;
     authRepoInput.value = githubRepo;
 
@@ -23,7 +41,55 @@ document.addEventListener('DOMContentLoaded', () => {
         getRepoContents();
     }
 
-    authButton.addEventListener('click', () => {
+    // Event Listeners
+    authButton.addEventListener('click', authenticate);
+    createFolderButton.addEventListener('click', createFolderHandler);
+    uploadFileButton.addEventListener('click', uploadFileHandler);
+    refreshButton.addEventListener('click', () => {
+    try {
+        if (typeof getRepoContents === 'function') {
+            refreshButton.disabled = true;
+            refreshButton.textContent = 'Refreshing...';
+            getRepoContents(currentFolder);
+            setTimeout(() => {
+                refreshButton.disabled = false;
+                refreshButton.textContent = 'Refresh';
+            }, 1000);
+        } else {
+            window.location.reload();
+        }
+    } catch (err) {
+        console.error("Error refreshing, reloading instead:", err);
+        window.location.reload();
+    }
+});
+    
+    // Modal Event Listeners
+    confirmRename.addEventListener('click', renameFolderHandler);
+    cancelRename.addEventListener('click', () => closeModal(renameFolderModal));
+    confirmDelete.addEventListener('click', deleteItemHandler);
+    cancelDelete.addEventListener('click', () => closeModal(deleteModal));
+    
+    // Close modals when clicking on X
+    document.querySelectorAll('.close').forEach(closeBtn => {
+        closeBtn.addEventListener('click', function() {
+            const modal = this.closest('.modal');
+            closeModal(modal);
+        });
+    });
+    
+    // Close modals when clicking outside
+    window.addEventListener('click', (event) => {
+        if (event.target === renameFolderModal) {
+            closeModal(renameFolderModal);
+        }
+        if (event.target === deleteModal) {
+            closeModal(deleteModal);
+        }
+    });
+
+    // Functions
+    function authenticate() {
         githubToken = authTokenInput.value;
         githubRepo = authRepoInput.value;
 
@@ -37,34 +103,36 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             alert('Please provide both a GitHub token and repository.');
         }
-    });
+    }
 
-    createFolderButton.addEventListener('click', () => {
+    function createFolderHandler() {
         const newFolderName = newFolderNameInput.value;
         if (newFolderName) {
             createFolder(newFolderName);
         } else {
             alert('Please enter a folder name.');
         }
-    });
+    }
 
-    uploadImageButton.addEventListener('click', () => {
-        const file = imageUploadInput.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = function() {
-                const base64Content = reader.result.split(',')[1];
-                uploadImage(file.name, base64Content);
-            }
-            reader.readAsDataURL(file);
+    function uploadFileHandler() {
+        const files = fileUploadInput.files;
+        if (files.length > 0) {
+            Array.from(files).forEach(file => {
+                const reader = new FileReader();
+                reader.onloadend = function() {
+                    const base64Content = reader.result.split(',')[1];
+                    uploadFile(file.name, base64Content);
+                }
+                reader.readAsDataURL(file);
+            });
         } else {
-            alert('Please select an image to upload.');
+            alert('Please select files to upload.');
         }
-    });
+    }
 
     function getRepoContents(path = '') {
         currentFolder = path;
-        currentFolderH3.textContent = `Current Folder: /${path}`;
+        currentFolderSpan.textContent = `/${path}`;
         const url = `https://api.github.com/repos/${githubRepo}/contents/${path}`;
 
         fetch(url, {
@@ -78,6 +146,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 displayContents(data);
             } else {
                 console.error('Error fetching repository contents:', data);
+                if (data.message === 'Bad credentials') {
+                    alert('Invalid GitHub token. Please check your token and try again.');
+                }
             }
         })
         .catch(error => {
@@ -87,15 +158,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function displayContents(contents) {
         const folderList = document.getElementById('folder-list');
-        const imageList = document.getElementById('image-list');
+        const fileList = document.getElementById('file-list');
 
         folderList.innerHTML = '';
-        imageList.innerHTML = '';
+        fileList.innerHTML = '';
 
+        // Add parent folder navigation if not in root
         if (currentFolder !== '') {
             const parentFolder = currentFolder.substring(0, currentFolder.lastIndexOf('/'));
             const listItem = document.createElement('li');
-            listItem.innerHTML = `<a href="#" data-path="${parentFolder}">.. (Parent)</a>`;
+            listItem.innerHTML = `
+                <a class="folder-link" data-path="${parentFolder}">
+                    <i class="fas fa-level-up-alt"></i>
+                    <span>.. (Parent Directory)</span>
+                </a>
+            `;
             listItem.addEventListener('click', (e) => {
                 e.preventDefault();
                 getRepoContents(parentFolder);
@@ -103,59 +180,138 @@ document.addEventListener('DOMContentLoaded', () => {
             folderList.appendChild(listItem);
         }
 
-        contents.forEach(item => {
-            if (item.type === 'dir') {
+        const folders = contents.filter(item => item.type === 'dir');
+        const files = contents.filter(item => item.type === 'file' && item.name !== '.gitkeep');
+
+        // Update counts
+        document.getElementById('folder-count').textContent = folders.length;
+        document.getElementById('file-count').textContent = files.length;
+
+        // Display folders
+        if (folders.length === 0 && currentFolder === '') {
+            folderList.innerHTML = `
+                <li class="empty-state">
+                    <i class="fas fa-folder-open"></i>
+                    <p>No folders found</p>
+                    <p class="empty-state-subtitle">Create your first folder to get started</p>
+                </li>
+            `;
+        } else {
+            folders.forEach(folder => {
                 const listItem = document.createElement('li');
-                listItem.innerHTML = `<a href="#" data-path="${item.path}">${item.name}</a>`;
-                listItem.addEventListener('click', (e) => {
+                listItem.innerHTML = `
+                    <a class="folder-link" data-path="${folder.path}">
+                        <i class="fas fa-folder"></i>
+                        <span>${folder.name}</span>
+                    </a>
+                    <div class="button-container">
+                        <button class="btn-icon btn-rename" title="Rename Folder">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn-icon btn-delete" title="Delete Folder">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+                
+                // Folder click to navigate
+                listItem.querySelector('.folder-link').addEventListener('click', (e) => {
                     e.preventDefault();
-                    getRepoContents(item.path);
+                    getRepoContents(folder.path);
                 });
+                
+                // Rename button
+                listItem.querySelector('.btn-rename').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openRenameFolderModal(folder.path, folder.name);
+                });
+                
+                // Delete button
+                listItem.querySelector('.btn-delete').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openDeleteModal(folder.path, '', 'folder', folder.name);
+                });
+                
                 folderList.appendChild(listItem);
-            } else if (item.type === 'file' && (item.name.endsWith('.png') || item.name.endsWith('.jpg') || item.name.endsWith('.jpeg') || item.name.endsWith('.gif'))) {
+            });
+        }
+
+        // Display files
+        if (files.length === 0) {
+            fileList.innerHTML = `
+                <li class="empty-state">
+                    <i class="fas fa-file"></i>
+                    <p>No files found</p>
+                    <p class="empty-state-subtitle">Upload your first file to get started</p>
+                </li>
+            `;
+        } else {
+            files.forEach(file => {
+                const fileExtension = file.name.split('.').pop().toLowerCase();
+                const fileType = getFileType(fileExtension);
+                
                 const listItem = document.createElement('li');
-                listItem.textContent = item.name;
-
-                const buttonContainer = document.createElement('div');
-
-                const copyUrlButton = document.createElement('button');
-                copyUrlButton.textContent = 'Copy URL';
-                copyUrlButton.addEventListener('click', () => {
-                    navigator.clipboard.writeText(item.download_url);
+                listItem.innerHTML = `
+                    <div class="file-item">
+                        <div class="file-icon ${fileType}">
+                            <i class="${getFileIcon(fileType)}"></i>
+                        </div>
+                        <div class="file-info">
+                            <div class="file-name">${file.name}</div>
+                            <div class="file-meta">${formatFileSize(file.size)}</div>
+                        </div>
+                    </div>
+                    <div class="button-container">
+                        <button class="btn-icon btn-download" title="Download">
+                            <i class="fas fa-download"></i>
+                        </button>
+                        <button class="btn-icon btn-delete" title="Delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+                
+                // Download button
+                listItem.querySelector('.btn-download').addEventListener('click', () => {
+                    window.open(file.download_url, '_blank');
                 });
-
-                const updateButton = document.createElement('button');
-                updateButton.textContent = 'Update';
-                updateButton.addEventListener('click', () => {
-                    const fileInput = document.createElement('input');
-                    fileInput.type = 'file';
-                    fileInput.addEventListener('change', (e) => {
-                        const file = e.target.files[0];
-                        if (file) {
-                            const reader = new FileReader();
-                            reader.onloadend = function() {
-                                const base64Content = reader.result.split(',')[1];
-                                updateImage(item.path, item.sha, base64Content);
-                            }
-                            reader.readAsDataURL(file);
-                        }
-                    });
-                    fileInput.click();
+                
+                // Delete button
+                listItem.querySelector('.btn-delete').addEventListener('click', () => {
+                    openDeleteModal(file.path, file.sha, 'file', file.name);
                 });
+                
+                fileList.appendChild(listItem);
+            });
+        }
+    }
 
-                const deleteButton = document.createElement('button');
-                deleteButton.textContent = 'Delete';
-                deleteButton.addEventListener('click', () => {
-                    deleteImage(item.path, item.sha);
-                });
+    function getFileType(extension) {
+        const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'];
+        const pdfExtensions = ['pdf'];
+        const documentExtensions = ['doc', 'docx', 'txt', 'rtf', 'odt'];
+        
+        if (imageExtensions.includes(extension)) return 'image';
+        if (pdfExtensions.includes(extension)) return 'pdf';
+        if (documentExtensions.includes(extension)) return 'document';
+        return 'other';
+    }
 
-                buttonContainer.appendChild(copyUrlButton);
-                buttonContainer.appendChild(updateButton);
-                buttonContainer.appendChild(deleteButton);
-                listItem.appendChild(buttonContainer);
-                imageList.appendChild(listItem);
-            }
-        });
+    function getFileIcon(fileType) {
+        switch(fileType) {
+            case 'image': return 'fas fa-image';
+            case 'pdf': return 'fas fa-file-pdf';
+            case 'document': return 'fas fa-file-alt';
+            default: return 'fas fa-file';
+        }
+    }
+
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 
     function createFolder(folderName) {
@@ -164,7 +320,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const data = {
             message: `Create folder ${folderName}`,
-            content: btoa('') // Empty content
+            content: btoa('') // Empty content for .gitkeep file
         };
 
         fetch(url, {
@@ -182,14 +338,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 newFolderNameInput.value = '';
             } else {
                 console.error('Error creating folder:', data);
+                alert('Error creating folder: ' + (data.message || 'Unknown error'));
             }
         })
         .catch(error => {
             console.error('Error creating folder:', error);
+            alert('Error creating folder: ' + error.message);
         });
     }
 
-    function uploadImage(fileName, base64Content) {
+    function uploadFile(fileName, base64Content) {
         const path = `${currentFolder ? currentFolder + '/' : ''}${fileName}`;
         const url = `https://api.github.com/repos/${githubRepo}/contents/${path}`;
 
@@ -204,48 +362,51 @@ document.addEventListener('DOMContentLoaded', () => {
             if (response.ok) {
                 return response.json();
             } else {
-                // If the file doesn't exist, response.ok will be false
                 return null;
             }
         })
         .then(existingFile => {
             const data = {
-                message: `Upload image ${fileName}`,
-                content: base64Content,
-                sha: existingFile ? existingFile.sha : undefined
+                message: `Upload file ${fileName}`,
+                content: base64Content
             };
 
-            fetch(url, {
+            // If file exists, include the SHA for update
+            if (existingFile) {
+                data.sha = existingFile.sha;
+                data.message = `Update file ${fileName}`;
+            }
+
+            return fetch(url, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `token ${githubToken}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(data)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.content) {
-                    getRepoContents(currentFolder);
-                    imageUploadInput.value = '';
-                } else {
-                    console.error('Error uploading image:', data);
-                }
-            })
-            .catch(error => {
-                console.error('Error uploading image:', error);
             });
         })
+        .then(response => response.json())
+        .then(data => {
+            if (data.content) {
+                getRepoContents(currentFolder);
+                fileUploadInput.value = '';
+            } else {
+                console.error('Error uploading file:', data);
+                alert('Error uploading file: ' + (data.message || 'Unknown error'));
+            }
+        })
         .catch(error => {
-            console.error('Error checking for existing image:', error);
+            console.error('Error uploading file:', error);
+            alert('Error uploading file: ' + error.message);
         });
     }
 
-    function deleteImage(path, sha) {
+    function deleteFile(path, sha) {
         const url = `https://api.github.com/repos/${githubRepo}/contents/${path}`;
 
         const data = {
-            message: `Delete image ${path}`,
+            message: `Delete file ${path}`,
             sha: sha
         };
 
@@ -262,41 +423,113 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.commit) {
                 getRepoContents(currentFolder);
             } else {
-                console.error('Error deleting image:', data);
+                console.error('Error deleting file:', data);
+                alert('Error deleting file: ' + (data.message || 'Unknown error'));
             }
         })
         .catch(error => {
-            console.error('Error deleting image:', error);
+            console.error('Error deleting file:', error);
+            alert('Error deleting file: ' + error.message);
         });
     }
 
-    function updateImage(path, sha, base64Content) {
+    function deleteFolder(path) {
+        // For folders, we need to delete all contents first
+        // This is a simplified version - in production, you'd want to recursively delete
         const url = `https://api.github.com/repos/${githubRepo}/contents/${path}`;
 
-        const data = {
-            message: `Update image ${path}`,
-            content: base64Content,
-            sha: sha
-        };
-
         fetch(url, {
-            method: 'PUT',
             headers: {
-                'Authorization': `token ${githubToken}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.content) {
-                getRepoContents(currentFolder);
-            } else {
-                console.error('Error updating image:', data);
+                'Authorization': `token ${githubToken}`
             }
         })
+        .then(response => response.json())
+        .then(contents => {
+            if (Array.isArray(contents)) {
+                // Delete all files in the folder
+                const deletePromises = contents.map(item => {
+                    if (item.type === 'file') {
+                        return fetch(`https://api.github.com/repos/${githubRepo}/contents/${item.path}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Authorization': `token ${githubToken}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                message: `Delete folder ${path}`,
+                                sha: item.sha
+                            })
+                        });
+                    }
+                    return Promise.resolve();
+                });
+
+                return Promise.all(deletePromises);
+            }
+        })
+        .then(() => {
+            getRepoContents(currentFolder);
+        })
         .catch(error => {
-            console.error('Error updating image:', error);
+            console.error('Error deleting folder:', error);
+            alert('Error deleting folder: ' + error.message);
         });
+    }
+
+    function renameFolderHandler() {
+        const newName = newFolderNameInputModal.value;
+        const oldPath = folderToRenamePath.value;
+        
+        if (!newName) {
+            alert('Please enter a new folder name');
+            return;
+        }
+
+        // Extract the parent path and create new path
+        const parentPath = oldPath.substring(0, oldPath.lastIndexOf('/'));
+        const newPath = parentPath ? `${parentPath}/${newName}` : newName;
+        
+        // Close modal first
+        closeModal(renameFolderModal);
+        
+        // Rename operation would require moving all files
+        // This is a complex operation with GitHub API
+        alert('Folder renaming functionality would require moving all files. This is a complex operation that needs additional implementation.');
+        
+        // For now, we'll just refresh
+        getRepoContents(currentFolder);
+    }
+
+    function deleteItemHandler() {
+        const path = itemToDeletePath.value;
+        const sha = itemToDeleteSha.value;
+        const type = itemToDeleteType.value;
+        
+        closeModal(deleteModal);
+        
+        if (type === 'file') {
+            deleteFile(path, sha);
+        } else if (type === 'folder') {
+            deleteFolder(path);
+        }
+    }
+
+    function openRenameFolderModal(path, currentName) {
+        folderToRenamePath.value = path;
+        newFolderNameInputModal.value = currentName;
+        newFolderNameInputModal.focus();
+        renameFolderModal.style.display = 'block';
+    }
+
+    function openDeleteModal(path, sha, type, name) {
+        itemToDeletePath.value = path;
+        itemToDeleteSha.value = sha;
+        itemToDeleteType.value = type;
+        deleteMessage.textContent = `Are you sure you want to delete ${type} "${name}"?`;
+        deleteModal.style.display = 'block';
+    }
+
+    function closeModal(modal) {
+        modal.style.display = 'none';
     }
 });
