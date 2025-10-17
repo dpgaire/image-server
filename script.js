@@ -144,7 +144,8 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(data => {
             if (Array.isArray(data)) {
                 displayContents(data);
-            } else {
+            }
+            else {
                 console.error('Error fetching repository contents:', data);
                 if (data.message === 'Bad credentials') {
                     alert('Invalid GitHub token. Please check your token and try again.');
@@ -262,6 +263,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </div>
                     <div class="button-container">
+                        <button class="btn-icon btn-copy" title="Copy Link">
+                            <i class="fas fa-copy"></i>
+                        </button>
                         <button class="btn-icon btn-download" title="Download">
                             <i class="fas fa-download"></i>
                         </button>
@@ -271,6 +275,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 `;
                 
+                // Copy link button
+                listItem.querySelector('.btn-copy').addEventListener('click', (e) => {
+                    const button = e.currentTarget;
+                    const url = `https://dpgaire.github.io/image-server/${file.path}`;
+                    navigator.clipboard.writeText(url).then(() => {
+                        button.innerHTML = '<i class="fas fa-check"></i>';
+                        setTimeout(() => {
+                            button.innerHTML = '<i class="fas fa-copy"></i>';
+                        }, 2000);
+                    });
+                });
+
                 // Download button
                 listItem.querySelector('.btn-download').addEventListener('click', () => {
                     window.open(file.download_url, '_blank');
@@ -336,7 +352,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.content) {
                 getRepoContents(currentFolder);
                 newFolderNameInput.value = '';
-            } else {
+            }
+            else {
                 console.error('Error creating folder:', data);
                 alert('Error creating folder: ' + (data.message || 'Unknown error'));
             }
@@ -361,7 +378,8 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(response => {
             if (response.ok) {
                 return response.json();
-            } else {
+            }
+            else {
                 return null;
             }
         })
@@ -391,7 +409,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.content) {
                 getRepoContents(currentFolder);
                 fileUploadInput.value = '';
-            } else {
+            }
+            else {
                 console.error('Error uploading file:', data);
                 alert('Error uploading file: ' + (data.message || 'Unknown error'));
             }
@@ -402,7 +421,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function deleteFile(path, sha) {
+    async function deleteFile(path, sha, norefresh = false) {
+        console.log(`Deleting file: ${path}`);
         const url = `https://api.github.com/repos/${githubRepo}/contents/${path}`;
 
         const data = {
@@ -410,70 +430,46 @@ document.addEventListener('DOMContentLoaded', () => {
             sha: sha
         };
 
-        fetch(url, {
+        const response = await fetch(url, {
             method: 'DELETE',
             headers: {
                 'Authorization': `token ${githubToken}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(data)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.commit) {
-                getRepoContents(currentFolder);
-            } else {
-                console.error('Error deleting file:', data);
-                alert('Error deleting file: ' + (data.message || 'Unknown error'));
-            }
-        })
-        .catch(error => {
-            console.error('Error deleting file:', error);
-            alert('Error deleting file: ' + error.message);
         });
+
+        if (!norefresh) {
+            getRepoContents(currentFolder);
+        }
+
+        console.log(`File deleted: ${path}`);
+        return response.json();
     }
 
-    function deleteFolder(path) {
-        // For folders, we need to delete all contents first
-        // This is a simplified version - in production, you'd want to recursively delete
+    async function deleteFolder(path) {
+        console.log(`Deleting folder: ${path}`);
         const url = `https://api.github.com/repos/${githubRepo}/contents/${path}`;
 
-        fetch(url, {
+        const response = await fetch(url, {
             headers: {
                 'Authorization': `token ${githubToken}`
             }
-        })
-        .then(response => response.json())
-        .then(contents => {
-            if (Array.isArray(contents)) {
-                // Delete all files in the folder
-                const deletePromises = contents.map(item => {
-                    if (item.type === 'file') {
-                        return fetch(`https://api.github.com/repos/${githubRepo}/contents/${item.path}`, {
-                            method: 'DELETE',
-                            headers: {
-                                'Authorization': `token ${githubToken}`,
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
-                                message: `Delete folder ${path}`,
-                                sha: item.sha
-                            })
-                        });
-                    }
-                    return Promise.resolve();
-                });
-
-                return Promise.all(deletePromises);
-            }
-        })
-        .then(() => {
-            getRepoContents(currentFolder);
-        })
-        .catch(error => {
-            console.error('Error deleting folder:', error);
-            alert('Error deleting folder: ' + error.message);
         });
+
+        const contents = await response.json();
+
+        if (Array.isArray(contents)) {
+            for (const item of contents) {
+                if (item.type === 'dir') {
+                    await deleteFolder(item.path);
+                } else {
+                    await deleteFile(item.path, item.sha, true);
+                }
+            }
+        }
+        getRepoContents(currentFolder);
+        console.log(`Folder deleted: ${path}`);
     }
 
     function renameFolderHandler() {
@@ -500,7 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
         getRepoContents(currentFolder);
     }
 
-    function deleteItemHandler() {
+    async function deleteItemHandler() {
         const path = itemToDeletePath.value;
         const sha = itemToDeleteSha.value;
         const type = itemToDeleteType.value;
@@ -510,7 +506,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (type === 'file') {
             deleteFile(path, sha);
         } else if (type === 'folder') {
-            deleteFolder(path);
+            await deleteFolder(path);
+            alert('Folder deleted successfully.');
         }
     }
 
