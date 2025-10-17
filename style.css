@@ -397,6 +397,11 @@ body {
     color: white;
 }
 
+.btn-copy {
+    background: var(--secondary);
+    color: white;
+}
+
 .btn-icon:hover {
     transform: scale(1.05);
 }
