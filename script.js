@@ -11,6 +11,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const fileUploadInput = document.getElementById('file-upload-input');
     const refreshButton = document.getElementById('refresh-button');
     const currentFolderSpan = document.getElementById('current-folder');
+    const folderSearchInput = document.getElementById('folder-search');
+    const fileSearchInput = document.getElementById('file-search');
+    const selectedFilesContainer = document.getElementById('selected-files-container');
+    const toastContainer = document.getElementById('toast-container');
     
     // Modal Elements
     const renameFolderModal = document.getElementById('rename-folder-modal');
@@ -45,6 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
     authButton.addEventListener('click', authenticate);
     createFolderButton.addEventListener('click', createFolderHandler);
     uploadFileButton.addEventListener('click', uploadFileHandler);
+    fileUploadInput.addEventListener('change', displaySelectedFiles);
     refreshButton.addEventListener('click', () => {
     try {
         if (typeof getRepoContents === 'function') {
@@ -63,6 +68,8 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.reload();
     }
 });
+    folderSearchInput.addEventListener('input', () => filterAndDisplay('folder'));
+    fileSearchInput.addEventListener('input', () => filterAndDisplay('file'));
     
     // Modal Event Listeners
     confirmRename.addEventListener('click', renameFolderHandler);
@@ -117,16 +124,37 @@ document.addEventListener('DOMContentLoaded', () => {
     function uploadFileHandler() {
         const files = fileUploadInput.files;
         if (files.length > 0) {
+            uploadFileButton.disabled = true;
+            uploadFileButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+
+            let filesUploaded = 0;
             Array.from(files).forEach(file => {
                 const reader = new FileReader();
                 reader.onloadend = function() {
                     const base64Content = reader.result.split(',')[1];
-                    uploadFile(file.name, base64Content);
+                    uploadFile(file.name, base64Content).then(() => {
+                        filesUploaded++;
+                        if (filesUploaded === files.length) {
+                            selectedFilesContainer.textContent = ''; // Clear the displayed file names
+                            uploadFileButton.disabled = false;
+                            uploadFileButton.innerHTML = '<i class="fas fa-upload"></i> Upload';
+                        }
+                    });
                 }
                 reader.readAsDataURL(file);
             });
         } else {
             alert('Please select files to upload.');
+        }
+    }
+
+    function displaySelectedFiles() {
+        const files = fileUploadInput.files;
+        if (files.length > 0) {
+            let fileNames = Array.from(files).map(file => file.name).join(', ');
+            selectedFilesContainer.textContent = `${fileNames}`;
+        } else {
+            selectedFilesContainer.textContent = '';
         }
     }
 
@@ -197,7 +225,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <p class="empty-state-subtitle">Create your first folder to get started</p>
                 </li>
             `;
-        } else {
+        }
+        else {
             folders.forEach(folder => {
                 const listItem = document.createElement('li');
                 listItem.innerHTML = `
@@ -246,7 +275,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <p class="empty-state-subtitle">Upload your first file to get started</p>
                 </li>
             `;
-        } else {
+        }
+        else {
             files.forEach(file => {
                 const fileExtension = file.name.split('.').pop().toLowerCase();
                 const fileType = getFileType(fileExtension);
@@ -331,6 +361,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function createFolder(folderName) {
+        createFolderButton.disabled = true;
+        createFolderButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+
         const path = `${currentFolder ? currentFolder + '/' : ''}${folderName}/.gitkeep`;
         const url = `https://api.github.com/repos/${githubRepo}/contents/${path}`;
 
@@ -352,6 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.content) {
                 getRepoContents(currentFolder);
                 newFolderNameInput.value = '';
+                showToast(`Folder '${folderName}' created successfully!`);
             }
             else {
                 console.error('Error creating folder:', data);
@@ -361,6 +395,10 @@ document.addEventListener('DOMContentLoaded', () => {
         .catch(error => {
             console.error('Error creating folder:', error);
             alert('Error creating folder: ' + error.message);
+        })
+        .finally(() => {
+            createFolderButton.disabled = false;
+            createFolderButton.innerHTML = '<i class="fas fa-plus"></i> Create';
         });
     }
 
@@ -369,7 +407,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const url = `https://api.github.com/repos/${githubRepo}/contents/${path}`;
 
         // First, try to get the file to see if it exists
-        fetch(url, {
+        return fetch(url, {
             method: 'GET',
             headers: {
                 'Authorization': `token ${githubToken}`
@@ -408,7 +446,7 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(data => {
             if (data.content) {
                 getRepoContents(currentFolder);
-                fileUploadInput.value = '';
+                showToast(`File '${fileName}' uploaded successfully!`);
             }
             else {
                 console.error('Error uploading file:', data);
@@ -528,5 +566,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function closeModal(modal) {
         modal.style.display = 'none';
+    }
+
+    function filterAndDisplay(type) {
+        const searchTerm = (type === 'folder' ? folderSearchInput.value : fileSearchInput.value).toLowerCase();
+        const list = document.getElementById(`${type}-list`);
+        const items = list.querySelectorAll('li');
+
+        items.forEach(item => {
+            // Ignore the parent directory link
+            if (item.querySelector('.fa-level-up-alt')) {
+                item.style.display = 'flex';
+                return;
+            }
+
+            const text = item.textContent.toLowerCase();
+            if (text.includes(searchTerm)) {
+                item.style.display = 'flex';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    }
+
+    function showToast(message) {
+        const toast = document.createElement('div');
+        toast.classList.add('toast');
+        toast.innerHTML = `<i class="fas fa-check-circle"></i> ${message}`;
+        toastContainer.appendChild(toast);
+
+        setTimeout(() => {
+            toast.classList.add('fade-out');
+            toast.addEventListener('animationend', () => {
+                toast.remove();
+            });
+        }, 3000);
     }
 });
