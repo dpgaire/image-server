@@ -11,6 +11,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const fileUploadInput = document.getElementById('file-upload-input');
     const refreshButton = document.getElementById('refresh-button');
     const currentFolderSpan = document.getElementById('current-folder');
+    const folderSearchInput = document.getElementById('folder-search');
+    const fileSearchInput = document.getElementById('file-search');
+    const selectedFilesContainer = document.getElementById('selected-files-container');
     
     // Modal Elements
     const renameFolderModal = document.getElementById('rename-folder-modal');
@@ -45,6 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
     authButton.addEventListener('click', authenticate);
     createFolderButton.addEventListener('click', createFolderHandler);
     uploadFileButton.addEventListener('click', uploadFileHandler);
+    fileUploadInput.addEventListener('change', displaySelectedFiles);
     refreshButton.addEventListener('click', () => {
     try {
         if (typeof getRepoContents === 'function') {
@@ -63,6 +67,8 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.reload();
     }
 });
+    folderSearchInput.addEventListener('input', () => filterAndDisplay('folder'));
+    fileSearchInput.addEventListener('input', () => filterAndDisplay('file'));
     
     // Modal Event Listeners
     confirmRename.addEventListener('click', renameFolderHandler);
@@ -117,16 +123,32 @@ document.addEventListener('DOMContentLoaded', () => {
     function uploadFileHandler() {
         const files = fileUploadInput.files;
         if (files.length > 0) {
+            let filesUploaded = 0;
             Array.from(files).forEach(file => {
                 const reader = new FileReader();
                 reader.onloadend = function() {
                     const base64Content = reader.result.split(',')[1];
-                    uploadFile(file.name, base64Content);
+                    uploadFile(file.name, base64Content).then(() => {
+                        filesUploaded++;
+                        if (filesUploaded === files.length) {
+                            selectedFilesContainer.textContent = ''; // Clear the displayed file names
+                        }
+                    });
                 }
                 reader.readAsDataURL(file);
             });
         } else {
             alert('Please select files to upload.');
+        }
+    }
+
+    function displaySelectedFiles() {
+        const files = fileUploadInput.files;
+        if (files.length > 0) {
+            let fileNames = Array.from(files).map(file => file.name).join(', ');
+            selectedFilesContainer.textContent = `${fileNames}`;
+        } else {
+            selectedFilesContainer.textContent = '';
         }
     }
 
@@ -369,7 +391,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const url = `https://api.github.com/repos/${githubRepo}/contents/${path}`;
 
         // First, try to get the file to see if it exists
-        fetch(url, {
+        return fetch(url, {
             method: 'GET',
             headers: {
                 'Authorization': `token ${githubToken}`
@@ -408,7 +430,6 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(data => {
             if (data.content) {
                 getRepoContents(currentFolder);
-                fileUploadInput.value = '';
             }
             else {
                 console.error('Error uploading file:', data);
@@ -528,5 +549,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function closeModal(modal) {
         modal.style.display = 'none';
+    }
+
+    function filterAndDisplay(type) {
+        const searchTerm = (type === 'folder' ? folderSearchInput.value : fileSearchInput.value).toLowerCase();
+        const list = document.getElementById(`${type}-list`);
+        const items = list.querySelectorAll('li');
+
+        items.forEach(item => {
+            // Ignore the parent directory link
+            if (item.querySelector('.fa-level-up-alt')) {
+                item.style.display = 'flex';
+                return;
+            }
+
+            const text = item.textContent.toLowerCase();
+            if (text.includes(searchTerm)) {
+                item.style.display = 'flex';
+            } else {
+                item.style.display = 'none';
+            }
+        });
     }
 });
