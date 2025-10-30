@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const folderSearchInput = document.getElementById('folder-search');
     const fileSearchInput = document.getElementById('file-search');
     const selectedFilesContainer = document.getElementById('selected-files-container');
+    const toastContainer = document.getElementById('toast-container');
     
     // Modal Elements
     const renameFolderModal = document.getElementById('rename-folder-modal');
@@ -123,6 +124,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function uploadFileHandler() {
         const files = fileUploadInput.files;
         if (files.length > 0) {
+            uploadFileButton.disabled = true;
+            uploadFileButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+
             let filesUploaded = 0;
             Array.from(files).forEach(file => {
                 const reader = new FileReader();
@@ -132,6 +136,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         filesUploaded++;
                         if (filesUploaded === files.length) {
                             selectedFilesContainer.textContent = ''; // Clear the displayed file names
+                            uploadFileButton.disabled = false;
+                            uploadFileButton.innerHTML = '<i class="fas fa-upload"></i> Upload';
                         }
                     });
                 }
@@ -219,7 +225,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <p class="empty-state-subtitle">Create your first folder to get started</p>
                 </li>
             `;
-        } else {
+        }
+        else {
             folders.forEach(folder => {
                 const listItem = document.createElement('li');
                 listItem.innerHTML = `
@@ -268,7 +275,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <p class="empty-state-subtitle">Upload your first file to get started</p>
                 </li>
             `;
-        } else {
+        }
+        else {
             files.forEach(file => {
                 const fileExtension = file.name.split('.').pop().toLowerCase();
                 const fileType = getFileType(fileExtension);
@@ -353,6 +361,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function createFolder(folderName) {
+        createFolderButton.disabled = true;
+        createFolderButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+
         const path = `${currentFolder ? currentFolder + '/' : ''}${folderName}/.gitkeep`;
         const url = `https://api.github.com/repos/${githubRepo}/contents/${path}`;
 
@@ -374,6 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.content) {
                 getRepoContents(currentFolder);
                 newFolderNameInput.value = '';
+                showToast(`Folder '${folderName}' created successfully!`);
             }
             else {
                 console.error('Error creating folder:', data);
@@ -383,6 +395,10 @@ document.addEventListener('DOMContentLoaded', () => {
         .catch(error => {
             console.error('Error creating folder:', error);
             alert('Error creating folder: ' + error.message);
+        })
+        .finally(() => {
+            createFolderButton.disabled = false;
+            createFolderButton.innerHTML = '<i class="fas fa-plus"></i> Create';
         });
     }
 
@@ -430,6 +446,7 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(data => {
             if (data.content) {
                 getRepoContents(currentFolder);
+                showToast(`File '${fileName}' uploaded successfully!`);
             }
             else {
                 console.error('Error uploading file:', data);
@@ -570,5 +587,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 item.style.display = 'none';
             }
         });
+    }
+
+    function showToast(message) {
+        const toast = document.createElement('div');
+        toast.classList.add('toast');
+        toast.innerHTML = `<i class="fas fa-check-circle"></i> ${message}`;
+        toastContainer.appendChild(toast);
+
+        setTimeout(() => {
+            toast.classList.add('fade-out');
+            toast.addEventListener('animationend', () => {
+                toast.remove();
+            });
+        }, 3000);
     }
 });
